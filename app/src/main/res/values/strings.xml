@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Mine Go installer</string>
     <string name="load_panel">Load Panel</string>
+    <string name="choose_file">Choose File</string>
+    <string name="auto_install">Auto Install</string>
+    <string name="manual_install">Manual Install</string>
 </resources>
