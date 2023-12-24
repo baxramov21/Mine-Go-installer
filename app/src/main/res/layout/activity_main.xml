@@ -12,7 +12,7 @@
         android:layout_height="wrap_content"
         android:text="@string/choose_file"
         android:textSize="16sp"
-        app:layout_constraintBottom_toTopOf="@id/installLocationRadioGroup"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
@@ -20,35 +20,4 @@
         app:layout_constraintVertical_bias="0.5"
         app:layout_constraintVertical_chainStyle="packed" />
 
-    <RadioGroup
-        android:id="@+id/installLocationRadioGroup"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/chooseFileButton"
-        app:layout_constraintVertical_bias="0.5"
-        app:layout_constraintVertical_chainStyle="packed">
-
-        <RadioButton
-            android:id="@+id/radioAutoInstall"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:checked="true"
-            android:text="@string/auto_install"
-            android:textSize="15sp" />
-
-        <RadioButton
-            android:id="@+id/radioManualInstall"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:text="@string/manual_install"
-            android:textSize="15sp" />
-    </RadioGroup>
 </androidx.constraintlayout.widget.ConstraintLayout>
