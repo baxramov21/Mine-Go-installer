@@ -1,13 +1,17 @@
 package com.baxramov.minegoinstaller
 
-import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -15,8 +19,23 @@ import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
-    private val PICK_FILE_REQUEST_CODE = 1
-    private val PICK_DIRECTORY_REQUEST_CODE = 2
+    private val chooseFileLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val data = result.data
+            if (result.resultCode == RESULT_OK && data != null) {
+                val fileUri: Uri? = data.data
+                onFileSelected(fileUri)
+            }
+        }
+
+    private val chooseDirectoryLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val data = result.data
+            if (result.resultCode == RESULT_OK && data != null) {
+                val directoryUri: Uri? = data.data
+                onDirectorySelected(directoryUri)
+            }
+        }
 
     private var selectedFileUri: Uri? = null
 
@@ -34,70 +53,78 @@ class MainActivity : AppCompatActivity() {
     private fun openFileChooser() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
         intent.type = "*/*"
-        startActivityForResult(intent, PICK_FILE_REQUEST_CODE)
+        chooseFileLauncher.launch(intent)
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
+    private fun onFileSelected(fileUri: Uri?) {
+        selectedFileUri = fileUri
+        if (selectedFileUri != null) {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+            chooseDirectoryLauncher.launch(intent)
+        }
+    }
 
-        if (requestCode == PICK_FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
-            selectedFileUri = data?.data
-            if (selectedFileUri != null) {
-                // Open SAF to let the user pick a directory
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-                startActivityForResult(intent, PICK_DIRECTORY_REQUEST_CODE)
-            }
-        } else if (requestCode == PICK_DIRECTORY_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
-            val treeUri: Uri? = data?.data
-            if (treeUri != null) {
-                // Copy the selected file to the chosen directory, preserving the original file name
-                copyFileToDirectory(selectedFileUri, treeUri)
+    private fun onDirectorySelected(directoryUri: Uri?) {
+        if (directoryUri != null) {
+            MainScope().launch {
+                copyFileToDirectory(selectedFileUri, directoryUri)
             }
         }
     }
 
-    private fun copyFileToDirectory(fileUri: Uri?, directoryUri: Uri) {
+    private suspend fun copyFileToDirectory(fileUri: Uri?, directoryUri: Uri) {
         try {
             if (fileUri != null) {
-                // Open input stream to read data from the selected file
                 val inputStream: InputStream? = contentResolver.openInputStream(fileUri)
 
-                // Get the original file name
                 val originalFileName = getFileName(fileUri)
 
-                // Create the new file in the chosen directory with the original file name
                 val documentFile = DocumentFile.fromTreeUri(this, directoryUri)
                 val existingFile = documentFile?.findFile(originalFileName)
 
-                // Delete the existing file if it exists
                 existingFile?.delete()
 
-                // Create the new file in the chosen directory
                 val newFile = documentFile?.createFile("*/*", originalFileName)
 
-                // Open output stream to write data to the new file
-                val outputStream: OutputStream? = contentResolver.openOutputStream(newFile!!.uri)
-
-                // Copy the data
-                inputStream?.use { input ->
-                    outputStream?.use { output ->
-                        val buffer = ByteArray(1024)
-                        var bytesRead: Int
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                        }
+                if (inputStream != null && newFile != null) {
+                    copyDataWithCoroutines(inputStream, newFile.uri)
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Error copying file", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 }
 
-                // Notify the user about the success
-                Toast.makeText(this, "File successfully copied", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "File successfully copied",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         } catch (e: IOException) {
-            // Handle input-output errors
             e.printStackTrace()
 
-            // Notify the user about the failure
-            Toast.makeText(this, "Error copying file", Toast.LENGTH_SHORT).show()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Error copying file", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private suspend fun copyDataWithCoroutines(inputStream: InputStream, outputUri: Uri) {
+        withContext(Dispatchers.IO) {
+            val outputStream: OutputStream? = contentResolver.openOutputStream(outputUri)
+
+            inputStream.use { input ->
+                outputStream?.use { output ->
+                    val buffer = ByteArray(1024)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                    }
+                }
+            }
         }
     }
 
@@ -114,7 +141,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        // If the display name is not found, generate a unique name
         return "copied_file_${UUID.randomUUID()}"
     }
 }
